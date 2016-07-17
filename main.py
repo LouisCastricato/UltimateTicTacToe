@@ -3,16 +3,6 @@ import nengo
 from nengo.networks import BasalGanglia
 import nengo_ocl
 import matplotlib.pyplot as plt
-import kivy
-from kivy.uix.popup import Popup
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.app import App
-from kivy.graphics import *
-from kivy.uix.widget import *
-from kivy.properties import *
-from kivy.uix.slider import Slider
 #X is 1, O is -1, and - is 0
 
 def CheckVictory(board, pos_y, pos_x, stride):
@@ -141,54 +131,8 @@ with model:
 with nengo_ocl.Simulator(model) as sim:
     sim.run(time)
 
-
-class BoxWidget(Widget):
-    r= NumericProperty(1)
-    g=NumericProperty(1)
-    def __init__(self,position, **kwargs):
-        super(BoxWidget,self).__init__(**kwargs)
-        self.bind(r = self.redraw)
-        self.bind(g = self.redraw)
-        self.Pos = position
-        with self.canvas:
-            Color(self.r,self.g,0,1)
-            Rectangle(pos=position, size=(200,200))
-
-    def redraw(self, *args):
-        self.canvas.clear()
-        with self.canvas:
-            Color(self.r, self.g, 0,1)
-            Rectangle(pos=self.Pos, size=(200,200))
-class GridDisplay(GridLayout):
-    def showtime(self,instance, value):
-        for i in range(0,len(self.squares)):
-            val = sim.data[gameState][value][i]
-
-            val = (val + 1)/2
-            self.squares[i].r = float(val)
-            self.squares[i].g = float(1 - val)
-
-    def __init__(self):
-        super(GridDisplay, self).__init__()
-        self.rows = 4
-        self.cols = 3
-        self.squares = [None] * in_dim
-        for i in range(0, in_dim):
-            self.squares[i] = BoxWidget(((i%3) * 200, ((i - i%3) / 3) * 200))
-            self.add_widget(self.squares[i])
-
-        self.s = Slider(min =0,max=len(sim.trange()) -1, value=0)
-        self.s.bind(value = self.showtime)
-        self.add_widget(self.s)
-class MyApp(App):
-    def build(self):
-        sc = GridDisplay()
-        return sc
-
-
 plt.plot(sim.trange(), sim.data[basalxProbe].argmax(axis=1))
 plt.plot(sim.trange(), sim.data[basaloProbe].argmax(axis=1))
 
 plt.show()
 
-#MyApp().run()
