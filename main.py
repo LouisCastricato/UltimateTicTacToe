@@ -46,7 +46,7 @@ def modifyboard(board, index, val):
 def minimax(board, flip,depth, coeff = 1, decay = 0.66):
     pos = 0
     sumv = 0
-    if depth != 0:
+    if depth > 0:
         for index in board:
             #Spot is available
             if index == 0:
@@ -59,7 +59,7 @@ def minimax(board, flip,depth, coeff = 1, decay = 0.66):
             pos+=1
     return sumv
 #First set gets returned as an array
-def minimax_initial(board, flip, depth, coeff = 1, decay = 1):
+def minimax_initial(board, flip, depth, coeff = 1, decay = 0.9):
     pos = 0
     sumv = [0]*9
     for index in board:
@@ -154,7 +154,7 @@ class GridDisplay_High(GridLayout):
                 board[i] = -1
         return board
     def put_ai(self, index, pos):
-        if self.high_squares[pos].squares[index].text== "--":
+        if self.high_squares[pos].squares[index].text== "--" and self.high_squares[index].winner == "--":
             self.high_squares[pos].squares[index].text= ai
             return True
         return False
@@ -169,7 +169,7 @@ class GridDisplay_High(GridLayout):
         highboard = self.btn_to_board()
         self.lowboards[index] = board
         made_move = False
-
+        defensive = True
         selected_board = 0
 
 
@@ -192,14 +192,13 @@ class GridDisplay_High(GridLayout):
         print winning_index
         if not made_move and w1[index][winning_index] != 0:
             made_move = self.put_ai(winning_index, index)
-
         winning_index = np.argmax(w2[index])
         if not made_move and w2[index][winning_index] != 0:
             made_move = self.put_ai(winning_index, index)
 
-        if self.high_squares[index].winner == "--":
-            l1_lvl_decision = minimax_initial(board, -1, 5)
-            l2_lvl_decision = minimax_initial(board, 1, 5)
+        if defensive:
+            l1_lvl_decision = minimax_initial(board, -1, 3)
+            l2_lvl_decision = minimax_initial(board, 1, 3)
             print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
             print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
 
