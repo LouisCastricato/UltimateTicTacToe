@@ -15,24 +15,26 @@ ai = "O"
 playerc = [1,0,0,1]
 aic = [0,1,0,1]
 optimal = [1,3,6,1,1,7,2,5,2]
-def CheckVictory(board, pos_y, pos_x, stride,pcheck = False, ptype = [0]):
+def CheckVictory(mboard, y, x, stride,pcheck = False, ptype = [0]):
     #check if previous move caused a win on vertical line
+    board = np.array(mboard).reshape(3,3)
     valc= [0]
     if pcheck:
         valc = ptype
-    if board[pos_x] == board[pos_x + stride] == board[pos_x + 2 * stride] and not board[pos_x] in valc:
+    #check if previous move caused a win on vertical line
+    if board[0][y] == board[1][y] == board [2][y] and not board[0][y] in valc:
         return True
 
     #check if previous move caused a win on horizontal line
-    if board[pos_y * stride] == board[pos_y * stride + 1] == board [pos_y * stride + 2] and not board[pos_y * stride] in valc:
+    if board[x][0] == board[x][1] == board [x][2] and not board[x][0] in valc:
         return True
 
     #check if previous move was on the main diagonal and caused a win
-    if pos_x == pos_y and board[0] == board[1 + stride] == board [2 + 2 * stride] and not board[0] in valc:
+    if x == y and board[0][0] == board[1][1] == board [2][2] and not board[0][0] in valc:
         return True
 
     #check if previous move was on the secondary diagonal and caused a win
-    if pos_x + pos_y == 2 and board[2 * stride] == board[1 + stride] == board[2] and not board[2] in valc:
+    if x + y == 2 and board[0][2] == board[1][1] == board [2][0] and not board[2][0] in valc:
         return True
 
     return False
@@ -154,7 +156,7 @@ class GridDisplay_High(GridLayout):
                 board[i] = -1
         return board
     def put_ai(self, index, pos):
-        if self.high_squares[pos].squares[index].text== "--" and self.high_squares[index].winner == "--":
+        if self.high_squares[pos].squares[index].text== "--" and self.high_squares[pos].winner == "--":
             self.high_squares[pos].squares[index].text= ai
             return True
         return False
@@ -197,8 +199,8 @@ class GridDisplay_High(GridLayout):
             made_move = self.put_ai(winning_index, index)
 
         if defensive:
-            l1_lvl_decision = minimax_initial(board, -1, 3)
-            l2_lvl_decision = minimax_initial(board, 1, 3)
+            l1_lvl_decision = minimax_initial(board, -1, 5)
+            l2_lvl_decision = minimax_initial(board, 1, 5)
             print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
             print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
 
