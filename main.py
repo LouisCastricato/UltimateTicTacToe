@@ -43,7 +43,7 @@ def modifyboard(board, index, val):
     newboard[index] = val
     return newboard
 
-def minimax(board, flip,depth, coeff, decay = 0.66):
+def minimax(board, flip,depth, coeff = 1, decay = 0.66):
     pos = 0
     sumv = 0
     if depth != 0:
@@ -51,7 +51,7 @@ def minimax(board, flip,depth, coeff, decay = 0.66):
             #Spot is available
             if index == 0:
                 #Check victory if we were to take one of the available spots
-                victory = CheckVictory(board, pos % 3, (pos - pos%3)/3, 3)
+                victory = CheckVictory(modifyboard(board,pos,flip), pos % 3, (pos - pos%3)/3,True, [0,-flip])
                 if victory:
                     sumv += coeff * flip
                 else:
@@ -67,7 +67,7 @@ def minimax_initial(board, flip, depth, coeff = 1, decay = 0.66):
         #print index
         if index == 0:
             #Check victory if we were to take one of the available spots
-            victory = CheckVictory(board, pos % 3, (pos - pos%3)/3, 3)
+            victory = CheckVictory(modifyboard(board, pos, flip), pos % 3, (pos - pos%3)/3, 3,True, [0, -flip])
             if victory:
                 sumv[pos] = flip
             else:
@@ -158,6 +158,12 @@ class GridDisplay_High(GridLayout):
             self.high_squares[pos].squares[index].text= ai
             return True
         return False
+    def win_next_turn(self,ptype):
+        ret = [[0] * 9] * 9
+
+        for i in range(len(self.lowboards)):
+            ret[i] = minimax_initial(self.lowboards[i], ptype, 1)
+        return ret
     #index is the index of the square, pos is the index inside the square
     def update(self, board,pos,index):
         highboard = self.btn_to_board()
@@ -178,7 +184,19 @@ class GridDisplay_High(GridLayout):
         print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
         print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
 
-        if self.high_squares[index].movecount == 1:
+
+        w1 = self.win_next_turn(-1)
+        w2 = self.win_next_turn(1)
+
+        print w1[index]
+        winning_index = np.argmax(w1[index])
+        if not made_move and w1[index][winning_index] != 0:
+            made_move = self.put_ai(winning_index, index)
+        winning_index = np.argmax(w2[index])
+
+        if not made_move and w2[index][winning_index] != 0:
+            made_move = self.put_ai(winning_index, index)
+        if not made_move and self.high_squares[index].movecount == 1:
             made_move = self.put_ai(optimal[pos],index)
 
         if self.high_squares[index].winner == "--":
@@ -191,7 +209,7 @@ class GridDisplay_High(GridLayout):
             selected_board = index
             if not made_move and np.argmax(max_list) == 0:
                 made_move = self.put_ai(max_l1,index)
-            if not made_move or np.argmax(max_list) != 0:
+            if not made_move and np.argmax(max_list) != 0:
                 made_move = self.put_ai(max_l2,index)
 
         #Update the board that the AI has chosen
