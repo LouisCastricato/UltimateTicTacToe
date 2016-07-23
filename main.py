@@ -1,17 +1,27 @@
 import numpy as np
-import nengo
-from nengo.networks import BasalGanglia
-import nengo_ocl
 import matplotlib.pyplot as plt
+import kivy
+from kivy.uix.popup import Popup
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.button import Button
+from kivy.app import App
 #X is 1, O is -1, and - is 0
 
+
+in_dim = 9
+player = "X"
+ai = "O"
+
+playerc = [1,0,0,1]
+aic = [0,1,0,1]
+optimal = [1,3,6,1,1,7,2,5,2]
 def CheckVictory(board, pos_y, pos_x, stride):
     #check if previous move caused a win on vertical line
     if board[pos_x] == board[pos_x + stride] == board [pos_x + 2 * stride] and not board[pos_x] == 0:
         return True
 
     #check if previous move caused a win on horizontal line
-    if board[pos_y * stride] == board[pos_y * stride + 1] == board [pos_y * stride + 2] and not board[pos_y] == 0:
+    if board[pos_y * stride] == board[pos_y * stride + 1] == board [pos_y * stride + 2] and board[pos_y * stride] != 0:
         return True
 
     #check if previous move was on the main diagonal and caused a win
@@ -30,22 +40,23 @@ def modifyboard(board, index, val):
     newboard[index] = val
     return newboard
 
-def minimax(board, flip):
+def minimax(board, flip,depth, coeff, decay = 0.66):
     pos = 0
     sumv = 0
-    for index in board:
-        #Spot is available
-        if index == 0:
-            #Check victory if we were to take one of the available spots
-            victory = CheckVictory(board, pos % 3, (pos - pos%3)/3, 3)
-            if victory:
-                sumv += flip
-            else:
-                sumv += minimax(modifyboard(board, pos, flip), -flip)
-        pos+=1
+    if depth != 0:
+        for index in board:
+            #Spot is available
+            if index == 0:
+                #Check victory if we were to take one of the available spots
+                victory = CheckVictory(board, pos % 3, (pos - pos%3)/3, 3)
+                if victory:
+                    sumv += coeff * flip
+                else:
+                    sumv += coeff * minimax(modifyboard(board, pos, flip), -flip, depth - 1, coeff * decay, decay)
+            pos+=1
     return sumv
 #First set gets returned as an array
-def minimax_initial(board, flip):
+def minimax_initial(board, flip, depth, coeff = 1, decay = 0.66):
     pos = 0
     sumv = [0]*9
     for index in board:
@@ -57,9 +68,16 @@ def minimax_initial(board, flip):
             if victory:
                 sumv[pos] = flip
             else:
-                sumv[pos]= minimax(modifyboard(board, pos, flip), -flip)
+                sumv[pos]= minimax(modifyboard(board, pos, flip), -flip, depth - 1, coeff, decay)
         pos+=1
     return sumv
+
+def checkallboard(board):
+    for i in range(0, len(board)):
+        if board[i] != 0:
+            if CheckVictory(board,i%3, (i- i%3)/3,3):
+                return True
+    return False
 
 def generateboard():
     board =  np.random.randint(low=-1, high=2, size=9)
@@ -85,54 +103,115 @@ def cycleinput(x, period, dt=0.01):
     return stimulus
 
 
-x = np.arange(np.pi/16, np.pi, np.pi/16)
-time = (np.pi) * 2
-timedelta = 1 #time/(float(len(x)) * 2)
-n_neurons = 3000
-in_dim = 9
+class GridDisplay_Low(GridLayout):
+    def btn_to_board(self):
+        board  = [0] * in_dim
+        for btn in range(0,in_dim):
+            if self.squares[btn].text == "X":
+                board[btn] = 1
+            elif self.squares[btn].text == "O":
+                board[btn] = -1
+        return board
+    def setcolor(self, color):
+        for btn in self.squares:
+            btn.background_color = color
+    def _update(self, i):
+        def _handle(value):
+            if value.text != player and value.text != ai and self.winner == "--":
+                value.text = player
+                board = self.btn_to_board()
+                if(checkallboard(board)):
+                    self.winner = player
+                    self.setcolor(playerc)
+                self.movecount+=1
+                self.superfunc(board,i, self.ind)
+        return _handle
+    def __init__(self,f,index):
+        super(GridDisplay_Low, self).__init__()
+        self.winner = "--"
+        self.superfunc = f
+        self.rows = int(np.sqrt(in_dim))
+        self.cols = int(np.sqrt(in_dim))
+        self.squares = [None] * in_dim
+        self.movecount = 0
+        self.ind = index
+        for i in range(in_dim):
+            self.squares[i] = Button(text='--', font_size=30)
+            func = self._update(i)
+            self.squares[i].bind(on_press=func)
+            self.add_widget(self.squares[i])
+
+class GridDisplay_High(GridLayout):
+    def btn_to_board(self):
+        board = [0] * in_dim
+        for i in range(in_dim):
+            if self.high_squares[i].winner == "X":
+                board[i] = 1
+            elif self.high_squares[i].winner == "O":
+                board[i] = -1
+        return board
+    def put_ai(self, index, pos):
+        if self.high_squares[pos].squares[index].text== "--":
+            self.high_squares[pos].squares[index].text= ai
+            return True
+        return False
+    #index is the index of the square, pos is the index inside the square
+    def update(self, board,pos,index):
+        highboard = self.btn_to_board()
+        self.lowboards[index] = board
+        made_move = False
+
+        selected_board = 0
 
 
-model= nengo.Network()
-inputvector = [None]*len(x)
-outputvector = [None]*len(x)
-for i in range(0, len(x)):
-    inputvector[i] = generateboard()
-    printboard(inputvector[i])
-    print ""
-    outputvector[i] = minimax_initial(inputvector[i], -1)
+        h_lvl_decision = minimax_initial(highboard, -1, 3)
+        #Look at where they played last
+        l1_lvl_decision = minimax_initial(board, -1, 3)
+        l2_lvl_decision = minimax_initial(board, 1, 3)
+        print "--------------"
+        print "h", h_lvl_decision
+        print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
+        print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
 
-inputvector=np.array(inputvector)
-with model:
-    inputstim = nengo.Node(output=cycleinput(inputvector, timedelta), size_out=in_dim)
-    selectionstim = nengo.Node(output=cycleinput(outputvector, timedelta), size_out=in_dim)
-
-    in_x = nengo.Ensemble(n_neurons,in_dim)
-    out_y = nengo.Ensemble(n_neurons, in_dim)
-    error=nengo.Ensemble(n_neurons, in_dim)
-
-    nengo.Connection(inputstim, in_x)
-
-    nengo.Connection(selectionstim, error,transform=-1)
-    nengo.Connection(out_y, error)
-
-    con = nengo.Connection(in_x, out_y, learning_rule_type=nengo.PES(1e-3))
-    nengo.Connection(error, con.learning_rule)
-
-    basalx = BasalGanglia(dimensions=9)
-    nengo.Connection(out_y, basalx.input)
-
-    basalo = BasalGanglia(dimensions=9)
-    nengo.Connection(out_y, basalo.input,transform=-1)
+        if self.high_squares[index].movecount == 1:
+            made_move = self.put_ai(optimal[pos],index)
 
 
-    gameState = nengo.Probe(out_y, synapse=0.1)
-    basalxProbe = nengo.Probe(basalx.output, synapse=0.2)
-    basaloProbe = nengo.Probe(basalo.output, synapse=0.2)
-with nengo_ocl.Simulator(model) as sim:
-    sim.run(time)
 
-plt.plot(sim.trange(), sim.data[basalxProbe].argmax(axis=1))
-plt.plot(sim.trange(), sim.data[basaloProbe].argmax(axis=1))
+        max_l1 = np.argmax(np.abs(l1_lvl_decision))
+        max_l2 = np.argmax(np.abs(l2_lvl_decision))
+        print max_l1, max_l2
+        max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
 
-plt.show()
+        selected_board=  index
+        if not made_move and np.argmax(max_list) == 0:
+            made_move = self.put_ai(max_l1,index)
+        if not made_move or np.argmax(max_list) != 0:
+            made_move = self.put_ai(max_l2,index)
 
+        #Update the board that the AI has chosen
+        self.lowboards[selected_board] = self.high_squares[selected_board].btn_to_board()
+        if checkallboard(self.lowboards[selected_board]):
+            self.high_squares[selected_board].winner = ai
+            self.high_squares[selected_board].setcolor(aic)
+
+
+    def __init__(self):
+        super(GridDisplay_High,self).__init__()
+        self.winner = "--"
+        self.rows = int(np.sqrt(in_dim))
+        self.cols = int(np.sqrt(in_dim))
+        self.high_squares = [None] * in_dim
+
+        self.lowboards = [[0] * in_dim] * in_dim
+
+        for i in range(in_dim):
+            self.high_squares[i] = GridDisplay_Low(self.update,i)
+            self.add_widget(self.high_squares[i])
+
+
+class TicTacToe(App):
+    def build(self):
+        return GridDisplay_High()
+
+TicTacToe().run()
