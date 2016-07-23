@@ -18,9 +18,9 @@ optimal = [1,3,6,1,1,7,2,5,2]
 def CheckVictory(board, pos_y, pos_x, stride,pcheck = False, ptype = [0]):
     #check if previous move caused a win on vertical line
     valc= [0]
-    if pcheck == True:
+    if pcheck:
         valc = ptype
-    if board[pos_x] == board[pos_x + stride] == board [pos_x + 2 * stride] and not board[pos_x] in valc:
+    if board[pos_x] == board[pos_x + stride] == board[pos_x + 2 * stride] and not board[pos_x] in valc:
         return True
 
     #check if previous move caused a win on horizontal line
@@ -51,7 +51,7 @@ def minimax(board, flip,depth, coeff = 1, decay = 0.66):
             #Spot is available
             if index == 0:
                 #Check victory if we were to take one of the available spots
-                victory = CheckVictory(modifyboard(board,pos,flip), pos % 3, (pos - pos%3)/3,True, [0,-flip])
+                victory = CheckVictory(modifyboard(board,pos,flip), pos % 3, (pos - pos%3)/3,3,True, [0,-flip])
                 if victory:
                     sumv += coeff * flip
                 else:
@@ -59,7 +59,7 @@ def minimax(board, flip,depth, coeff = 1, decay = 0.66):
             pos+=1
     return sumv
 #First set gets returned as an array
-def minimax_initial(board, flip, depth, coeff = 1, decay = 0.66):
+def minimax_initial(board, flip, depth, coeff = 1, decay = 1):
     pos = 0
     sumv = [0]*9
     for index in board:
@@ -71,7 +71,7 @@ def minimax_initial(board, flip, depth, coeff = 1, decay = 0.66):
             if victory:
                 sumv[pos] = flip
             else:
-                sumv[pos]= minimax(modifyboard(board, pos, flip), -flip, depth - 1, coeff, decay)
+                sumv[pos] = minimax(modifyboard(board, pos, flip), -flip, depth - 1, coeff, decay)
         pos+=1
     return sumv
 
@@ -162,7 +162,7 @@ class GridDisplay_High(GridLayout):
         ret = [[0] * 9] * 9
 
         for i in range(len(self.lowboards)):
-            ret[i] = minimax_initial(self.lowboards[i], ptype, 1)
+            ret[i] = minimax_initial(self.lowboards[i], ptype,1)
         return ret
     #index is the index of the square, pos is the index inside the square
     def update(self, board,pos,index):
@@ -176,34 +176,36 @@ class GridDisplay_High(GridLayout):
         h1_lvl_decision = minimax_initial(highboard, -1, 3)
         h2_lvl_decision = minimax_initial(highboard, 1, 3)
         #Look at where they played last
-        l1_lvl_decision = minimax_initial(board, -1, 3)
-        l2_lvl_decision = minimax_initial(board, 1, 3)
         print "--------------"
         print "h1", h1_lvl_decision
         print "h2", h2_lvl_decision
-        print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
-        print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
-
-
         w1 = self.win_next_turn(-1)
         w2 = self.win_next_turn(1)
-
+        printboard(board)
         print w1[index]
+        print w2[index]
+
+        if not made_move and self.high_squares[index].movecount == 1:
+           made_move = self.put_ai(optimal[pos],index)
+
         winning_index = np.argmax(w1[index])
+        print winning_index
         if not made_move and w1[index][winning_index] != 0:
             made_move = self.put_ai(winning_index, index)
-        winning_index = np.argmax(w2[index])
 
+        winning_index = np.argmax(w2[index])
         if not made_move and w2[index][winning_index] != 0:
             made_move = self.put_ai(winning_index, index)
-        if not made_move and self.high_squares[index].movecount == 1:
-            made_move = self.put_ai(optimal[pos],index)
 
         if self.high_squares[index].winner == "--":
+            l1_lvl_decision = minimax_initial(board, -1, 5)
+            l2_lvl_decision = minimax_initial(board, 1, 5)
+            print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
+            print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
+
 
             max_l1 = np.argmax(np.abs(l1_lvl_decision))
             max_l2 = np.argmax(np.abs(l2_lvl_decision))
-            print max_l1, max_l2
             max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
 
             selected_board = index
