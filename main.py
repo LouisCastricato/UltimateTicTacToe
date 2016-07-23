@@ -14,7 +14,7 @@ ai = "O"
 
 playerc = [1,0,0,1]
 aic = [0,1,0,1]
-optimal = [1,3,6,1,1,7,2,5,2]
+optimal = [1,7,1,5,1,3,3,1,5]
 def CheckVictory(mboard, y, x, stride,pcheck = False, ptype = [0]):
     #check if previous move caused a win on vertical line
     board = np.array(mboard).reshape(3,3)
@@ -166,57 +166,128 @@ class GridDisplay_High(GridLayout):
         for i in range(len(self.lowboards)):
             ret[i] = minimax_initial(self.lowboards[i], ptype,1)
         return ret
+    def considerIndex(self, index,w1,w2, pos,board):
+        made_move = False
+        defensive = True
+
+        winning_index = np.argmin(w1[index])
+        if not made_move and w1[index][winning_index] < 0:
+            made_move = self.put_ai(winning_index, index)
+        winning_index = np.argmax(w2[index])
+        if not made_move and w2[index][winning_index] > 0:
+            made_move = self.put_ai(winning_index, index)
+
+        if defensive and not made_move:
+            l1_lvl_decision = minimax_initial(board, -1, 4)
+            l2_lvl_decision = minimax_initial(board, 1, 4)
+
+
+            max_l1 = np.argmax(np.abs(l1_lvl_decision))
+            max_l2 = np.argmax(np.abs(l2_lvl_decision))
+            max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
+            if not made_move and np.argmax(max_list) == 0:
+                made_move = self.put_ai(max_l1,index)
+            if not made_move and np.argmax(max_list) != 0:
+                made_move = self.put_ai(max_l2,index)
+        return made_move
+    def considernboards(self, lst):
+        max_index = 0
+        max_value = 0
+        max_board = 0
+
+        min_value = 0
+        min_index = 0
+        min_board = 0
+        for i in lst:
+            arr = minimax_initial(self.lowboards[i],-1,3)
+
+            tmin = np.argmin(arr)
+            imin = arr[tmin]
+
+            if imin <= min_value:
+                min_value = imin
+                min_index = tmin
+                min_board = i
+            tmax= np.argmax(arr)
+            imax = arr[tmax]
+
+            if imax >= max_value:
+                max_value = imax
+                max_index = tmax
+                max_board = i
+        return [[max_value, max_index, max_board], [min_value,min_index, min_board]]
     #index is the index of the square, pos is the index inside the square
     def update(self, board,pos,index):
         highboard = self.btn_to_board()
         self.lowboards[index] = board
         made_move = False
-        defensive = True
         selected_board = 0
 
-
+        self.enemyrecent.append(index)
         h1_lvl_decision = minimax_initial(highboard, -1, 3)
         h2_lvl_decision = minimax_initial(highboard, 1, 3)
         #Look at where they played last
         print "--------------"
         print "h1", h1_lvl_decision
         print "h2", h2_lvl_decision
-        w1 = self.win_next_turn(-1)
-        w2 = self.win_next_turn(1)
-        printboard(board)
-        print w1[index]
-        print w2[index]
+        w1 = np.array(np.negative(self.win_next_turn(-1))).clip(0)
+        w2 = np.array(self.win_next_turn(1)).clip(0)
 
-        if not made_move and self.high_squares[index].movecount == 1:
-           made_move = self.put_ai(optimal[pos],index)
+        r1 = []
+        r2 = []
 
-        winning_index = np.argmax(w1[index])
-        print winning_index
-        if not made_move and w1[index][winning_index] != 0:
-            made_move = self.put_ai(winning_index, index)
-        winning_index = np.argmax(w2[index])
-        if not made_move and w2[index][winning_index] != 0:
-            made_move = self.put_ai(winning_index, index)
+        for arr in w1:
+            r1.append(np.sum(arr))
+        for arr in w2:
+            r2.append(np.sum(arr))
 
-        if defensive:
-            l1_lvl_decision = minimax_initial(board, -1, 5)
-            l2_lvl_decision = minimax_initial(board, 1, 5)
-            print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
-            print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
+        max1 = np.argmax(r1)
+        max2 = np.argmax(r2)
+        print r1
+        print r2
+        print max1
+        #made_move = self.considerIndex(max1,w1,w2,pos,self.lowboards[max1])
+        if np.sum(w1[max1]) != 0:
+            made_move = self.put_ai(np.argmax(w1[max1]), max1)
+        w1 = np.negative(w1)
+        if len(self.myrecent) > 0:
+            mine = self.considernboards(self.myrecent)
+        theirs = self.considernboards(self.enemyrecent)
 
+        if len(self.myrecent) > 0 and np.abs(mine[1][0]) > np.abs(theirs[0][0]) and not made_move:
+            made_move = self.considerIndex(mine[1][1],w1,w2,pos,self.lowboards[mine[1][1]])
+            if made_move:
+                selected_board = mine[1][1]
 
-            max_l1 = np.argmax(np.abs(l1_lvl_decision))
-            max_l2 = np.argmax(np.abs(l2_lvl_decision))
-            max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
-
+        if len(self.myrecent) > 0 and np.abs(mine[0][0]) > np.abs(theirs[1][0]):
+            made_move = self.considerIndex(mine[0][1],w1,w2,pos,self.lowboards[mine[0][1]])
+            if made_move:
+                selected_board = mine[0][1]
+        if not made_move:
+            made_move = self.considerIndex(index, w1,w2,pos,board)
+        if made_move:
             selected_board = index
-            if not made_move and np.argmax(max_list) == 0:
-                made_move = self.put_ai(max_l1,index)
-            if not made_move and np.argmax(max_list) != 0:
-                made_move = self.put_ai(max_l2,index)
+
+
+
+        if not made_move:
+            newIndex = np.argmin(h1_lvl_decision)
+            oppIndex = np.argmax(h2_lvl_decision)
+
+            max_list = np.abs([h1_lvl_decision[newIndex], h2_lvl_decision[oppIndex]])
+
+            if np.argmax(max_list) == 0:
+                selected_board = newIndex
+            if np.argmax(max_list) != 0:
+                selected_board = oppIndex
+            self.considerIndex(selected_board,w1,w2,pos,self.lowboards[selected_board])
 
         #Update the board that the AI has chosen
         self.lowboards[selected_board] = self.high_squares[selected_board].btn_to_board()
+
+        self.myrecent.append(selected_board)
+        self.myrecent = list(set(self.myrecent))
+        self.enemyrecent = list(set(self.enemyrecent))
         if checkallboard(self.lowboards[selected_board], True, [1,0]):
             self.high_squares[selected_board].winner = ai
             self.high_squares[selected_board].setcolor(aic)
@@ -231,6 +302,11 @@ class GridDisplay_High(GridLayout):
 
         self.lowboards = [[0] * in_dim] * in_dim
 
+        self.enemyrecent = [0,1,2,3,4,5,6,7,8]
+        self.myrecent  = [0,1,2,3,4,5,6,7,8]
+
+
+
         for i in range(in_dim):
             self.high_squares[i] = GridDisplay_Low(self.update,i)
             self.add_widget(self.high_squares[i])
@@ -239,5 +315,13 @@ class GridDisplay_High(GridLayout):
 class TicTacToe(App):
     def build(self):
         return GridDisplay_High()
-
+'''
+board = [0] * 9
+r = [None] * 9
+for i in range(9):
+    board[i] = 1
+    r[i] = np.argmax(minimax_initial(board,-1,10))
+    board[i] = 0
+print r
+'''
 TicTacToe().run()
