@@ -15,21 +15,24 @@ ai = "O"
 playerc = [1,0,0,1]
 aic = [0,1,0,1]
 optimal = [1,3,6,1,1,7,2,5,2]
-def CheckVictory(board, pos_y, pos_x, stride):
+def CheckVictory(board, pos_y, pos_x, stride,pcheck = False, ptype = [0]):
     #check if previous move caused a win on vertical line
-    if board[pos_x] == board[pos_x + stride] == board [pos_x + 2 * stride] and not board[pos_x] == 0:
+    valc= [0]
+    if pcheck == True:
+        valc = ptype
+    if board[pos_x] == board[pos_x + stride] == board [pos_x + 2 * stride] and not board[pos_x] in valc:
         return True
 
     #check if previous move caused a win on horizontal line
-    if board[pos_y * stride] == board[pos_y * stride + 1] == board [pos_y * stride + 2] and board[pos_y * stride] != 0:
+    if board[pos_y * stride] == board[pos_y * stride + 1] == board [pos_y * stride + 2] and not board[pos_y * stride] in valc:
         return True
 
     #check if previous move was on the main diagonal and caused a win
-    if pos_x == pos_y and board[0] == board[1 + stride] == board [2 + 2 * stride] and not board[0] == 0:
+    if pos_x == pos_y and board[0] == board[1 + stride] == board [2 + 2 * stride] and not board[0] in valc:
         return True
 
     #check if previous move was on the secondary diagonal and caused a win
-    if pos_x + pos_y == 2 and board[2 * stride] == board[1 + stride] == board[2] and not board[2] == 0:
+    if pos_x + pos_y == 2 and board[2 * stride] == board[1 + stride] == board[2] and not board[2] in valc:
         return True
 
     return False
@@ -72,10 +75,10 @@ def minimax_initial(board, flip, depth, coeff = 1, decay = 0.66):
         pos+=1
     return sumv
 
-def checkallboard(board):
+def checkallboard(board, pcheck=False, ptype=[0]):
     for i in range(0, len(board)):
         if board[i] != 0:
-            if CheckVictory(board,i%3, (i- i%3)/3,3):
+            if CheckVictory(board,i%3, (i- i%3)/3,3,pcheck,ptype):
                 return True
     return False
 
@@ -164,34 +167,36 @@ class GridDisplay_High(GridLayout):
         selected_board = 0
 
 
-        h_lvl_decision = minimax_initial(highboard, -1, 3)
+        h1_lvl_decision = minimax_initial(highboard, -1, 3)
+        h2_lvl_decision = minimax_initial(highboard, 1, 3)
         #Look at where they played last
         l1_lvl_decision = minimax_initial(board, -1, 3)
         l2_lvl_decision = minimax_initial(board, 1, 3)
         print "--------------"
-        print "h", h_lvl_decision
+        print "h1", h1_lvl_decision
+        print "h2", h2_lvl_decision
         print "l1", l1_lvl_decision, np.sum(l1_lvl_decision)
         print "l2", l2_lvl_decision, np.sum(l2_lvl_decision)
 
         if self.high_squares[index].movecount == 1:
             made_move = self.put_ai(optimal[pos],index)
 
+        if self.high_squares[index].winner == "--":
 
+            max_l1 = np.argmax(np.abs(l1_lvl_decision))
+            max_l2 = np.argmax(np.abs(l2_lvl_decision))
+            print max_l1, max_l2
+            max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
 
-        max_l1 = np.argmax(np.abs(l1_lvl_decision))
-        max_l2 = np.argmax(np.abs(l2_lvl_decision))
-        print max_l1, max_l2
-        max_list = np.abs([l1_lvl_decision[max_l1], l2_lvl_decision[max_l2]])
-
-        selected_board=  index
-        if not made_move and np.argmax(max_list) == 0:
-            made_move = self.put_ai(max_l1,index)
-        if not made_move or np.argmax(max_list) != 0:
-            made_move = self.put_ai(max_l2,index)
+            selected_board = index
+            if not made_move and np.argmax(max_list) == 0:
+                made_move = self.put_ai(max_l1,index)
+            if not made_move or np.argmax(max_list) != 0:
+                made_move = self.put_ai(max_l2,index)
 
         #Update the board that the AI has chosen
         self.lowboards[selected_board] = self.high_squares[selected_board].btn_to_board()
-        if checkallboard(self.lowboards[selected_board]):
+        if checkallboard(self.lowboards[selected_board], True, [1,0]):
             self.high_squares[selected_board].winner = ai
             self.high_squares[selected_board].setcolor(aic)
 
